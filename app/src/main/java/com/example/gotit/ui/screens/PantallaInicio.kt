@@ -11,31 +11,51 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.compose.ui.layout.ContentScale
+import com.example.gotit.R
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun PantallaInicio(navController: NavController) {
     Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Puedes reemplazar esto por un logo con Image()
-            Text(
-                text = "GotIt!",
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold
+
+            Image(
+                painter = painterResource(id = R.drawable.mi_logo),
+                contentDescription = "Logo de GotIt",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .align(Alignment.TopCenter),
+                contentScale = ContentScale.Fit
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
 
-            Button(
-                onClick = { navController.navigate("coleccion") },
-                modifier = Modifier.fillMaxWidth(0.6f)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Iniciar")
+                Text(
+                    text = "GotIt!",
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF1565C0) // azul fuerte
+
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                Button(
+                    onClick = { navController.navigate("coleccion") },
+                    modifier = Modifier.fillMaxWidth(0.6f)
+                ) {
+                    Text("Iniciar")
+                }
             }
         }
     }

@@ -10,12 +10,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.gotit.data.model.ObjetoColeccion
 import com.example.gotit.ui.components.TarjetaObjeto
 import com.example.gotit.ui.components.DetalleObjeto
 import com.example.gotit.viewmodel.ColeccionViewModel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,9 +31,19 @@ fun PantallaColeccion(
     var objetoSeleccionado by remember { mutableStateOf<ObjetoColeccion?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // Filtros activos
     var categoriaSeleccionada by remember { mutableStateOf("Todas") }
-    val categoriasDisponibles = listOf("Todas") + objetos.map { it.categoria }.distinct()
+    var precioRangoActivo by remember { mutableStateOf(0f..1000f) }
+    var fechaInicioActiva by remember { mutableStateOf("") }
+    var fechaFinActiva by remember { mutableStateOf("") }
 
+    // Filtro temporales
+    var categoriaTemp by remember { mutableStateOf("Todas") }
+    var precioRangoTemp by remember { mutableStateOf(0f..1000f) }
+    var fechaInicioTemp by remember { mutableStateOf("") }
+    var fechaFinTemp by remember { mutableStateOf("") }
+
+    val categoriasDisponibles = listOf("Todas") + objetos.map { it.categoria }.distinct()
     val totalArticulos = objetos.size
     val totalValor = objetos.sumOf { it.precio }
 
@@ -67,7 +81,6 @@ fun PantallaColeccion(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // CABECERA CON TÍTULO, RESUMEN Y FILTRO
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -94,16 +107,87 @@ fun PantallaColeccion(
 
                     DropdownMenu(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.width(300.dp)
                     ) {
+                        Text("Categoría", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(8.dp))
                         categoriasDisponibles.forEach { categoria ->
                             DropdownMenuItem(
                                 text = { Text(categoria) },
                                 onClick = {
-                                    categoriaSeleccionada = categoria
-                                    expanded = false
+                                    categoriaTemp = categoria
                                 }
                             )
+                        }
+
+                        Divider()
+
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Rango de precios (€):", style = MaterialTheme.typography.labelLarge)
+                            RangeSlider(
+                                value = precioRangoTemp,
+                                onValueChange = { precioRangoTemp = it },
+                                valueRange = 0f..1000f,
+                                steps = 10
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("%.2f €".format(precioRangoTemp.start))
+                                Text("%.2f €".format(precioRangoTemp.endInclusive))
+                            }
+                        }
+
+                        Divider()
+
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Desde (yyyy-MM-dd):", style = MaterialTheme.typography.labelLarge)
+                            TextField(
+                                value = fechaInicioTemp,
+                                onValueChange = { fechaInicioTemp = it },
+                                placeholder = { Text("2024-01-01") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Hasta (yyyy-MM-dd):", style = MaterialTheme.typography.labelLarge)
+                            TextField(
+                                value = fechaFinTemp,
+                                onValueChange = { fechaFinTemp = it },
+                                placeholder = { Text("2025-01-01") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Divider()
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(onClick = {
+                                categoriaTemp = "Todas"
+                                precioRangoTemp = 0f..1000f
+                                fechaInicioTemp = ""
+                                fechaFinTemp = ""
+                            }) {
+                                Text("Limpiar")
+                            }
+                            Button(onClick = {
+                                categoriaSeleccionada = categoriaTemp
+                                precioRangoActivo = precioRangoTemp
+                                fechaInicioActiva = fechaInicioTemp
+                                fechaFinActiva = fechaFinTemp
+                                expanded = false
+                            }) {
+                                Text("Aplicar")
+                            }
                         }
                     }
                 }
@@ -111,10 +195,10 @@ fun PantallaColeccion(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            val objetosFiltrados = if (categoriaSeleccionada == "Todas") {
-                objetos
-            } else {
-                objetos.filter { it.categoria == categoriaSeleccionada }
+            val objetosFiltrados = objetos.filter { objeto ->
+                (categoriaSeleccionada == "Todas" || objeto.categoria == categoriaSeleccionada) &&
+                        objeto.precio in precioRangoActivo &&
+                        estaEnRangoDeFecha(objeto.fecha, fechaInicioActiva, fechaFinActiva)
             }
 
             if (objetosFiltrados.isEmpty()) {
@@ -171,5 +255,20 @@ fun PantallaColeccion(
                 }
             }
         }
+    }
+}
+
+private val fechaFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+private fun estaEnRangoDeFecha(fecha: String, inicio: String, fin: String): Boolean {
+    return try {
+        val fechaObj = LocalDate.parse(fecha, fechaFormatter)
+        val inicioObj = if (inicio.isNotBlank()) LocalDate.parse(inicio, fechaFormatter) else null
+        val finObj = if (fin.isNotBlank()) LocalDate.parse(fin, fechaFormatter) else null
+
+        (inicioObj == null || !fechaObj.isBefore(inicioObj)) &&
+                (finObj == null || !fechaObj.isAfter(finObj))
+    } catch (e: Exception) {
+        true 
     }
 }
