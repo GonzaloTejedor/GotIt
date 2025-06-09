@@ -41,10 +41,13 @@ fun PantallaEditar(
     var categoria by remember { mutableStateOf(objeto.categoria) }
     var precioTexto by remember { mutableStateOf(objeto.precio.toString()) }
     var imagenUri by remember { mutableStateOf(objeto.imagenUri) }
+    var expandedCategorias by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         imagenUri = uri?.toString() ?: imagenUri
     }
+
+    val categoriasDisponibles = viewModel.categoriasConocidas
 
     Scaffold(
         topBar = {
@@ -53,8 +56,11 @@ fun PantallaEditar(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    if (nombre.isNotBlank()) {
-                        val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                    val precioValido = precioTexto.toDoubleOrNull() != null && precioTexto.toDouble() >= 0.0
+                    val camposValidos = nombre.isNotBlank() && categoria.isNotBlank() && precioValido
+
+                    if (camposValidos) {
+                        val precio = precioTexto.toDouble()
                         val objetoEditado = objeto.copy(
                             nombre = nombre,
                             descripcion = descripcion,
@@ -66,7 +72,13 @@ fun PantallaEditar(
                         Toast.makeText(context, "Objeto actualizado", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     } else {
-                        Toast.makeText(context, "El nombre es obligatorio", Toast.LENGTH_SHORT).show()
+                        val mensajeError = when {
+                            nombre.isBlank() -> "El nombre es obligatorio"
+                            categoria.isBlank() -> "La categoría es obligatoria"
+                            !precioValido -> "Introduce un precio válido (número positivo)"
+                            else -> "Revisa los campos"
+                        }
+                        Toast.makeText(context, mensajeError, Toast.LENGTH_SHORT).show()
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary
@@ -82,6 +94,8 @@ fun PantallaEditar(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Text("Editar objeto", style = MaterialTheme.typography.headlineSmall)
+
             OutlinedTextField(
                 value = nombre,
                 onValueChange = { nombre = it },
@@ -97,13 +111,39 @@ fun PantallaEditar(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = categoria,
-                onValueChange = { categoria = it },
-                label = { Text("Categoría") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Categoría sólo selección, no editable
+            ExposedDropdownMenuBox(
+                expanded = expandedCategorias,
+                onExpandedChange = { expandedCategorias = !expandedCategorias }
+            ) {
+                OutlinedTextField(
+                    value = categoria,
+                    onValueChange = { /* No permitir editar */ },
+                    label = { Text("Categoría") },
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategorias)
+                    },
+                    singleLine = true
+                )
+                ExposedDropdownMenu(
+                    expanded = expandedCategorias,
+                    onDismissRequest = { expandedCategorias = false }
+                ) {
+                    categoriasDisponibles.forEach { opcion ->
+                        DropdownMenuItem(
+                            text = { Text(opcion) },
+                            onClick = {
+                                categoria = opcion
+                                expandedCategorias = false
+                            }
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = precioTexto,
@@ -116,19 +156,19 @@ fun PantallaEditar(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
             ) {
-                Text("Imagen:", style = MaterialTheme.typography.bodyMedium)
                 IconButton(onClick = { launcher.launch("image/*") }) {
-                    Icon(Icons.Default.Photo, contentDescription = "Cambiar imagen")
+                    Icon(Icons.Default.Photo, contentDescription = "Seleccionar imagen")
                 }
+                Text("Cambiar imagen", style = MaterialTheme.typography.bodyMedium)
             }
 
             if (imagenUri.isNotBlank()) {
                 Image(
                     painter = rememberAsyncImagePainter(imagenUri),
-                    contentDescription = "Imagen del objeto",
+                    contentDescription = "Imagen seleccionada",
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)

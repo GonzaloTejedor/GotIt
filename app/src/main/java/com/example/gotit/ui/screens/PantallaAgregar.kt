@@ -23,7 +23,6 @@ import com.example.gotit.data.model.ObjetoColeccion
 import com.example.gotit.viewmodel.ColeccionViewModel
 import java.text.SimpleDateFormat
 import java.util.*
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaAgregar(
@@ -34,28 +33,36 @@ fun PantallaAgregar(
 
     var nombre by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
-    var categoria by remember { mutableStateOf("") }
+    var usarCategoriaExistente by remember { mutableStateOf(true) }
+    var categoriaExistente by remember { mutableStateOf("") }
+    var nuevaCategoria by remember { mutableStateOf("") }
     var precioTexto by remember { mutableStateOf("") }
-    var imagenUri by remember { mutableStateOf<String>("") }
+    var imagenUri by remember { mutableStateOf("") }
+    var expandedCategorias by remember { mutableStateOf(false) }
 
     val fechaActual = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 
-    // Selector de imagen
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         imagenUri = uri?.toString() ?: ""
     }
+
+    val categoriasDisponibles = viewModel.categoriasConocidas
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Nuevo objeto") }) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    if (nombre.isNotBlank()) {
-                        val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                    val categoriaFinal = if (usarCategoriaExistente) categoriaExistente.trim() else nuevaCategoria.trim()
+                    val precioValido = precioTexto.toDoubleOrNull() != null && precioTexto.toDouble() >= 0.0
+                    val camposValidos = nombre.isNotBlank() && categoriaFinal.isNotBlank() && precioValido
+
+                    if (camposValidos) {
+                        val precio = precioTexto.toDouble()
                         val objeto = ObjetoColeccion(
                             nombre = nombre,
                             descripcion = descripcion,
-                            categoria = categoria,
+                            categoria = categoriaFinal,
                             fecha = fechaActual,
                             imagenUri = imagenUri,
                             precio = precio
@@ -64,7 +71,13 @@ fun PantallaAgregar(
                         Toast.makeText(context, "Objeto añadido", Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     } else {
-                        Toast.makeText(context, "El nombre es obligatorio", Toast.LENGTH_SHORT).show()
+                        val mensajeError = when {
+                            nombre.isBlank() -> "El nombre es obligatorio"
+                            categoriaFinal.isBlank() -> "La categoría es obligatoria"
+                            !precioValido -> "Introduce un precio válido (número positivo)"
+                            else -> "Revisa los campos"
+                        }
+                        Toast.makeText(context, mensajeError, Toast.LENGTH_SHORT).show()
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary
@@ -97,13 +110,62 @@ fun PantallaAgregar(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = categoria,
-                onValueChange = { categoria = it },
-                label = { Text("Categoría") },
-                singleLine = true,
+            // Switch para elegir modo de categoría
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                Text("Usar categoría existente")
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = usarCategoriaExistente,
+                    onCheckedChange = { usarCategoriaExistente = it }
+                )
+            }
+
+            if (usarCategoriaExistente) {
+                // Selección desplegable de categorías existentes
+                ExposedDropdownMenuBox(
+                    expanded = expandedCategorias,
+                    onExpandedChange = { expandedCategorias = !expandedCategorias }
+                ) {
+                    OutlinedTextField(
+                        value = categoriaExistente,
+                        onValueChange = { categoriaExistente = it },
+                        label = { Text("Categoría") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategorias)
+                        },
+                        singleLine = true
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedCategorias,
+                        onDismissRequest = { expandedCategorias = false }
+                    ) {
+                        categoriasDisponibles.forEach { opcion ->
+                            DropdownMenuItem(
+                                text = { Text(opcion) },
+                                onClick = {
+                                    categoriaExistente = opcion
+                                    expandedCategorias = false
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Campo para escribir nueva categoría
+                OutlinedTextField(
+                    value = nuevaCategoria,
+                    onValueChange = { nuevaCategoria = it },
+                    label = { Text("Nueva categoría") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             OutlinedTextField(
                 value = precioTexto,
@@ -114,7 +176,6 @@ fun PantallaAgregar(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Imagen
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -137,7 +198,6 @@ fun PantallaAgregar(
                 )
             }
 
-            // Fecha
             Text(
                 text = "Fecha: $fechaActual",
                 style = MaterialTheme.typography.bodyMedium,

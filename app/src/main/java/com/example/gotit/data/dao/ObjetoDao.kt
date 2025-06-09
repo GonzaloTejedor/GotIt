@@ -18,4 +18,7 @@ interface ObjetoDao {
     @Update
     suspend fun actualizar(objeto: ObjetoColeccion)
 
+    @Query("SELECT * FROM objetos")
+    suspend fun obtenerObjetosInstantaneo(): List<ObjetoColeccion>
+
 }
